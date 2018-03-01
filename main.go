@@ -8,10 +8,17 @@ import (
 	"runtime"
 	"strings"
 	"time"
+	"net/http"
 
 	"github.com/BurntSushi/toml"
 	"github.com/mreiferson/go-options"
+	"io/ioutil"
 )
+
+type AbstractProxy struct {
+	oauthProxy map[string]*OAuthProxy
+	serveMux   http.Handler
+}
 
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
@@ -22,7 +29,7 @@ func main() {
 	skipAuthRegex := StringArray{}
 	googleGroups := StringArray{}
 
-	config := flagSet.String("config", "", "path to config file")
+	//config := flagSet.String("config", "", "path to config file")
 	showVersion := flagSet.Bool("version", false, "print version string")
 
 	flagSet.String("http-address", "127.0.0.1:4180", "[http://]<addr>:<port> or unix://<path> to listen on for HTTP clients")
@@ -61,7 +68,7 @@ func main() {
 	flagSet.String("cookie-name", "_oauth2_proxy", "the name of the cookie that the oauth_proxy creates")
 	flagSet.String("cookie-secret", "", "the seed string for secure cookies (optionally base64 encoded)")
 	flagSet.String("cookie-domain", "", "an optional cookie domain to force cookies to (ie: .yourcompany.com)*")
-	flagSet.Duration("cookie-expire", time.Duration(168)*time.Hour, "expire timeframe for cookie")
+	flagSet.Duration("cookie-expire", time.Duration(168) * time.Hour, "expire timeframe for cookie")
 	flagSet.Duration("cookie-refresh", time.Duration(0), "refresh the cookie after this duration; 0 to disable")
 	flagSet.Bool("cookie-secure", true, "set secure (HTTPS) cookie flag")
 	flagSet.Bool("cookie-httponly", true, "set HttpOnly cookie flag")
@@ -81,6 +88,11 @@ func main() {
 
 	flagSet.String("signature-key", "", "GAP-Signature request signature key (algorithm:secretkey)")
 
+	// Added by Ankit
+	google := flagSet.Bool("google", false, "Provides Oauth2 service for google")
+	fb := flagSet.Bool("fb", false, "Provides Oauth2 service for facebook")
+	git := flagSet.Bool("github", false, "Provides Oauth2 service for github")
+
 	flagSet.Parse(os.Args[1:])
 
 	if *showVersion {
@@ -90,14 +102,104 @@ func main() {
 
 	opts := NewOptions()
 
-	cfg := make(EnvOptions)
-	if *config != "" {
+	/*if *config != "" {
 		_, err := toml.DecodeFile(*config, &cfg)
 		if err != nil {
 			log.Fatalf("ERROR: failed to load config file %s - %s", *config, err)
 		}
+	}*/
+	var googleOAuthproxy, fbOAuthproxy, githubOAuthproxy *OAuthProxy
+	cfg := make(EnvOptions)
+	if *google {
+		googleOpts := NewOptions()
+		cfg = loadOptionsFromConfig("/home/ankit/projects/src/github.com/47Billion/oauth2_proxy/config/google.cfg", cfg)
+		googleOAuthproxy = verifyOpts(googleOpts, flagSet, cfg)
 	}
-	cfg.LoadEnvForStruct(opts)
+	if *fb {
+		fbOpts := NewOptions()
+		cfg = loadOptionsFromConfig("/home/ankit/projects/src/github.com/47Billion/oauth2_proxy/config/facebook.cfg", cfg)
+		fbOAuthproxy = verifyOpts(fbOpts, flagSet, cfg)
+	}
+	if *git {
+		cfg = loadOptionsFromConfig("/home/ankit/projects/src/github.com/47Billion/oauth2_proxy/config/github.cfg", cfg)
+		githubOAuthproxy = verifyOpts(opts, flagSet, cfg)
+	}
+
+	//cfg.LoadEnvForStruct(opts)
+
+
+	serveMux := http.NewServeMux()
+	abstractProxy := &AbstractProxy{
+		oauthProxy: map[string]*OAuthProxy{
+			"google": googleOAuthproxy,
+			"fb": fbOAuthproxy,
+			"github": githubOAuthproxy,
+		},
+		serveMux: serveMux,
+	}
+
+	//s := &Server{
+	//	Handler: LoggingHandler(os.Stdout, oauthproxy, opts.RequestLogging, opts.RequestLoggingFormat),
+	//	Opts:    opts,
+	//}
+
+	s := &Server{
+		Handler: LoggingHandler(os.Stdout, abstractProxy, opts.RequestLogging, opts.RequestLoggingFormat),
+		Opts:    opts,
+	}
+	s.ListenAndServe()
+}
+
+func (a *AbstractProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	pathString := req.URL.Path;
+	fmt.Println("PATHSTRING: ", pathString)
+	var p *OAuthProxy
+	if strings.HasPrefix(pathString, "/google") {
+		p = a.oauthProxy["google"]
+	} else if strings.HasPrefix(pathString, "/fb") {
+		p = a.oauthProxy["fb"]
+	} else if strings.HasPrefix(pathString, "/github") {
+		p = a.oauthProxy["github"]
+	}
+
+	if p == nil && req.URL.Path != "/login" {
+		rw.WriteHeader(404)
+		rw.Write([]byte("404 Something went wrong - " + http.StatusText(404)))
+		return
+	}
+
+	switch path := req.URL.Path; {
+	case path == "/login":
+		fmt.Println("Inside Login CASE: ", path)
+		data, err := ioutil.ReadFile("/home/ankit/projects/src/github.com/47Billion/oauth2_proxy/html/login.html")
+		if nil == err {
+			rw.Write(data)
+		} else {
+			rw.WriteHeader(404)
+			rw.Write([]byte("404 Something went wrong - " + http.StatusText(404)))
+		}
+	case path == p.RobotsPath:
+		p.RobotsTxt(rw)
+	case path == p.PingPath:
+		p.PingPage(rw)
+	case p.IsWhitelistedRequest(req):
+		p.serveMux.ServeHTTP(rw, req)
+	case path == p.SignInPath:
+		p.SignIn(rw, req)
+	case path == p.SignOutPath:
+		p.SignOut(rw, req)
+	case path == p.OAuthStartPath:
+		p.OAuthStart(rw, req)
+	case path == p.OAuthCallbackPath:
+		p.OAuthCallback(rw, req)
+	case path == p.AuthOnlyPath:
+		p.AuthenticateOnly(rw, req)
+	default:
+		p.Proxy(rw, req)
+	}
+}
+
+func verifyOpts(opts *Options, flagSet *flag.FlagSet, cfg map[string]interface{}) *OAuthProxy {
 	options.Resolve(opts, flagSet, cfg)
 
 	err := opts.Validate()
@@ -124,10 +226,15 @@ func main() {
 			log.Fatalf("FATAL: unable to open %s %s", opts.HtpasswdFile, err)
 		}
 	}
+	return oauthproxy
+}
 
-	s := &Server{
-		Handler: LoggingHandler(os.Stdout, oauthproxy, opts.RequestLogging, opts.RequestLoggingFormat),
-		Opts:    opts,
+func loadOptionsFromConfig(configFor string, cfg map[string]interface{}) map[string]interface{} {
+	if configFor != "" {
+		_, err := toml.DecodeFile(configFor, &cfg)
+		if err != nil {
+			log.Fatalf("ERROR: failed to load config file %s - %s", configFor, err)
+		}
 	}
-	s.ListenAndServe()
+	return cfg
 }
