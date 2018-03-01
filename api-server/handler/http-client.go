@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"io/ioutil"
 
-	"github.com/47Billion/api-server/models"
+	"github.com/47Billion/oauth2_proxy/api-server/models"
 
 	"github.com/sethgrid/pester"
 	"github.com/apex/log"

@@ -3,7 +3,7 @@ package handler
 import (
 	"fmt"
 	"net/http"
-	"github.com/47Billion/api-server/models"
+	"github.com/47Billion/oauth2_proxy/api-server/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/apex/log"

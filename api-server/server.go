@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/47Billion/api-server/handler"
+	"github.com/47Billion/oauth2_proxy/api-server/handler"
 
 	"github.com/gin-gonic/gin"
 )
