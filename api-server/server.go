@@ -1,4 +1,4 @@
-package main
+package api_server
 
 import (
 	"github.com/47Billion/oauth2_proxy/api-server/handler"
@@ -10,7 +10,7 @@ const (
 	RBACServerPort = ":9090"
 )
 
-func main() {
+func StartServer() {
 	router := gin.Default()
 
 	router.GET("/ping", func(c *gin.Context) {

@@ -10,9 +10,12 @@ import (
 	"time"
 	"net/http"
 
+	"github.com/47Billion/oauth2_proxy/config"
+
 	"github.com/BurntSushi/toml"
 	"github.com/mreiferson/go-options"
 	"io/ioutil"
+	"github.com/47Billion/oauth2_proxy/api-server"
 )
 
 type AbstractProxy struct {
@@ -92,12 +95,17 @@ func main() {
 	google := flagSet.Bool("google", false, "Provides Oauth2 service for google")
 	fb := flagSet.Bool("fb", false, "Provides Oauth2 service for facebook")
 	git := flagSet.Bool("github", false, "Provides Oauth2 service for github")
+	thirdPatryUrl := flagSet.String("thirdparty-url", "", "the OAuth Redirect URL. ie: \"https://internalapp.yourcompany.com/oauth2/callback\"")
 
 	flagSet.Parse(os.Args[1:])
 
 	if *showVersion {
 		fmt.Printf("oauth2_proxy v%s (built with %s)\n", VERSION, runtime.Version())
 		return
+	}
+
+	if *thirdPatryUrl != "" {
+		config.ThirdPartyUrl = *thirdPatryUrl
 	}
 
 	opts := NewOptions()
@@ -113,15 +121,18 @@ func main() {
 	if *google {
 		googleOpts := NewOptions()
 		cfg = loadOptionsFromConfig("/home/ankit/projects/src/github.com/47Billion/oauth2_proxy/config/google.cfg", cfg)
+		config.Oauth2Config["google"] = cfg
 		googleOAuthproxy = verifyOpts(googleOpts, flagSet, cfg)
 	}
 	if *fb {
 		fbOpts := NewOptions()
 		cfg = loadOptionsFromConfig("/home/ankit/projects/src/github.com/47Billion/oauth2_proxy/config/facebook.cfg", cfg)
+		config.Oauth2Config["fb"] = cfg
 		fbOAuthproxy = verifyOpts(fbOpts, flagSet, cfg)
 	}
 	if *git {
 		cfg = loadOptionsFromConfig("/home/ankit/projects/src/github.com/47Billion/oauth2_proxy/config/github.cfg", cfg)
+		config.Oauth2Config["github"] = cfg
 		githubOAuthproxy = verifyOpts(opts, flagSet, cfg)
 	}
 
@@ -147,6 +158,7 @@ func main() {
 		Handler: LoggingHandler(os.Stdout, abstractProxy, opts.RequestLogging, opts.RequestLoggingFormat),
 		Opts:    opts,
 	}
+	go api_server.StartServer()
 	s.ListenAndServe()
 }
 

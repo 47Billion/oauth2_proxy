@@ -82,6 +82,7 @@ func createGithubAccessToken(endpoint string, reqData models.GithubTokenRequest)
 		return
 	} else if status != 200 {
 		log.Errorf("createGithubAccessToken() something went wrong statusCode=%d, msg=%s", status, string(respData))
+		err = fmt.Errorf("createGithubAccessToken() something went wrong statusCode=%d, msg=%s", status, string(respData))
 
 	}
 	return
@@ -113,87 +114,34 @@ func serverRequest(endpoint, provider string) (err error, respData []byte) {
 	return
 }
 
-func getGitUser(endpoint string) (err error, respData []byte) {
+func redirectRequest(endpoint string, token map[string]string) (err error) {
 	// Client
 	client := pester.New()
 	client.KeepLog = true
 
-	// Response
+	data, err := json.Marshal(token)
+	if nil != err {
+		log.Errorf("redirectRequest() Unable to marshal request data err=%+v", err)
+		return
+	}
+
+	// New Request object
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(data))
 	var resp *http.Response
-	resp, err = client.Get(endpoint)
+	resp, err = client.Do(req)
 	if nil != err {
-		log.Errorf("getGitUser() Unable to get user details err=%+v", err)
+		log.Errorf("redirectRequest() Unable to call token API err=%+v", err)
 		return
 	}
 
-	// Read response body data
-	respData, err = ioutil.ReadAll(resp.Body)
+	status := resp.StatusCode
+	respData, err := ioutil.ReadAll(resp.Body)
 	if nil != err {
-		log.Errorf("getGitUser() Unable to read response err=%+v", err)
+		log.Errorf("redirectRequest() Unable to read response err=%+v", err)
 		return
-	}
-	return
-}
+	} else if status != 200 {
+		log.Errorf("redirectRequest() something went wrong statusCode=%d, msg=%s", status, string(respData))
 
-func getFBToken(endpoint string) (err error, respData []byte) {
-	// Client
-	client := pester.New()
-	client.KeepLog = true
-
-	// Response
-	var resp *http.Response
-	resp, err = client.Get(endpoint)
-	if nil != err {
-		log.Errorf("getFBToken() Unable to get FB access_token err=%+v", err)
-		return
-	}
-
-	respData, err = ioutil.ReadAll(resp.Body)
-	if nil != err {
-		log.Errorf("getFBToken() Unable to read FB response err=%+v", err)
-		return
-	}
-	return
-}
-
-func inspectFBToken(endpoint string) (err error, respData []byte) {
-	// Client
-	client := pester.New()
-	client.KeepLog = true
-
-	// Response
-	var resp *http.Response
-	resp, err = client.Get(endpoint)
-	if nil != err {
-		log.Errorf("inspectFBToken() Unable to debug FB access_token err=%+v", err)
-		return
-	}
-
-	respData, err = ioutil.ReadAll(resp.Body)
-	if nil != err {
-		log.Errorf("inspectFBToken() Unable to read FB response err=%+v", err)
-		return
-	}
-	return
-}
-
-func getGoogleUserInfo(endpoint string) (err error, respData []byte) {
-	// Client
-	client := pester.New()
-	client.KeepLog = true
-
-	// Response
-	var resp *http.Response
-	resp, err = client.Get(endpoint)
-	if nil != err {
-		log.Errorf("inspectFBToken() Unable to debug FB access_token err=%+v", err)
-		return
-	}
-
-	respData, err = ioutil.ReadAll(resp.Body)
-	if nil != err {
-		log.Errorf("inspectFBToken() Unable to read FB response err=%+v", err)
-		return
 	}
 	return
 }

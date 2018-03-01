@@ -3,12 +3,16 @@ package handler
 import (
 	"fmt"
 	"net/http"
+	"strings"
+	"encoding/json"
+	"strconv"
+
 	"github.com/47Billion/oauth2_proxy/api-server/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/apex/log"
-	"strings"
-	"encoding/json"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/47Billion/oauth2_proxy/config"
 )
 
 const (
@@ -118,7 +122,21 @@ func Google(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!"})
+	redirectResponse := models.RedirectResponse{
+		Id:userInfo.Id,
+		Name:userInfo.Name,
+		Email:userInfo.Email,
+		Link:userInfo.Link,
+		Picture:userInfo.Picture,
+		Gender:userInfo.Gender,
+	}
+	err, tokenString := createJWTToken(redirectResponse)
+	if nil != err {
+		log.Errorf("Google() Unable to create JWT token; err=%+v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!", "token": tokenString})
 }
 
 // Process oauth2 callback request for facebook, this will generate new access token and get user details.
@@ -163,8 +181,17 @@ func Facebook(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!"})
+	redirectResponse := models.RedirectResponse{
+		Id: userInfo.Id,
+		Name:userInfo.Name,
+	}
+	err, tokenString := createJWTToken(redirectResponse)
+	if nil != err {
+		log.Errorf("Facebook() Unable to create JWT token; err=%+v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!", "token": tokenString})
 }
 
 // Process oauth2 callback request for github, this will generate new access token and get user details.
@@ -173,8 +200,6 @@ func Github(c *gin.Context) {
 	var err error
 	var code = c.Query("code")
 	var state = c.Query("state")
-
-	githubUser := make(map[string]interface{})
 
 	// New request token data
 	token := models.GithubTokenRequest{
@@ -210,6 +235,42 @@ func Github(c *gin.Context) {
 		return
 	}
 
-	log.Infof("User Details: %+v", githubUser)
-	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!"})
+	log.Infof("User Details: %+v", gitUserInfo)
+	id := strconv.FormatInt(gitUserInfo.Id, 10)
+	redirectResponse := models.RedirectResponse{
+		Id:id,
+		Name:gitUserInfo.Name,
+		Email:gitUserInfo.Email,
+		Link:gitUserInfo.HtmlUrl,
+		Picture:gitUserInfo.AvatarUrl,
+	}
+	err, tokenString := createJWTToken(redirectResponse)
+	if nil != err {
+		log.Errorf("Github() Unable to create JWT token; err=%+v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		return
+	}
+	tokenMap := map[string]string{"token": tokenString}
+	err = redirectRequest(config.ThirdPartyUrl, tokenMap)
+	if nil != err {
+		log.Errorf("Github() Unable to send JWT token at redirectURL; err=%+v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!", "token": tokenString})
+}
+
+func createJWTToken(data interface{}) (err error, tokenString string) {
+	// Create a new token object, specifying signing method and the claims
+	// you would like it to contain.
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"data":data})
+
+	// Sign and get the complete encoded token as a string using the secret
+	tokenString, err = token.SignedString([]byte("47BOauth2Proxy"))
+	if nil != err {
+		log.Errorf("createJWTToken() Unable to create JWT token; err=%+v", err)
+		return
+	}
+	fmt.Println(tokenString, err)
+	return
 }

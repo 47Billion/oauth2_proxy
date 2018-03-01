@@ -72,7 +72,7 @@ type FBUserInfo struct {
 }
 
 type GitUserInfo struct {
-	Id               string `json:"id"`
+	Id               int64 `json:"id"`
 	Email            string `json:"email"`
 	Name             string `json:"name"`
 	SiteAdmin        bool `json:"site_admin"`
