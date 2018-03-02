@@ -95,7 +95,7 @@ func main() {
 	google := flagSet.Bool("google", false, "Provides Oauth2 service for google")
 	fb := flagSet.Bool("fb", false, "Provides Oauth2 service for facebook")
 	git := flagSet.Bool("github", false, "Provides Oauth2 service for github")
-	thirdPatryUrl := flagSet.String("thirdparty-url", "", "the OAuth Redirect URL. ie: \"https://internalapp.yourcompany.com/oauth2/callback\"")
+	callbackUrl := flagSet.String("callback-url", "", "the OAuth Redirect URL. ie: \"https://internalapp.yourcompany.com/oauth2/callback\"")
 
 	flagSet.Parse(os.Args[1:])
 
@@ -104,36 +104,34 @@ func main() {
 		return
 	}
 
-	if *thirdPatryUrl != "" {
-		config.ThirdPartyUrl = *thirdPatryUrl
+	// TODO : What if callbackUrl is empty, need to exit from system?
+	if *callbackUrl != "" {
+		config.CallbackUrl = *callbackUrl
 	}
 
 	opts := NewOptions()
-
-	/*if *config != "" {
-		_, err := toml.DecodeFile(*config, &cfg)
-		if err != nil {
-			log.Fatalf("ERROR: failed to load config file %s - %s", *config, err)
-		}
-	}*/
 	var googleOAuthproxy, fbOAuthproxy, githubOAuthproxy *OAuthProxy
-	cfg := make(EnvOptions)
+
 	if *google {
 		googleOpts := NewOptions()
-		cfg = loadOptionsFromConfig("/home/ankit/projects/src/github.com/47Billion/oauth2_proxy/config/google.cfg", cfg)
-		config.Oauth2Config["google"] = cfg
-		googleOAuthproxy = verifyOpts(googleOpts, flagSet, cfg)
+		googleCfg := make(EnvOptions)
+		googleCfg = loadOptionsFromConfig("config/google.cfg", googleCfg)
+		config.Oauth2Config["google"] = googleCfg
+		googleOAuthproxy = verifyOpts(googleOpts, flagSet, googleCfg)
 	}
 	if *fb {
 		fbOpts := NewOptions()
-		cfg = loadOptionsFromConfig("/home/ankit/projects/src/github.com/47Billion/oauth2_proxy/config/facebook.cfg", cfg)
-		config.Oauth2Config["fb"] = cfg
-		fbOAuthproxy = verifyOpts(fbOpts, flagSet, cfg)
+		fbCfg := make(EnvOptions)
+		fbCfg = loadOptionsFromConfig("config/facebook.cfg", fbCfg)
+		config.Oauth2Config["fb"] = fbCfg
+		fbOAuthproxy = verifyOpts(fbOpts, flagSet, fbCfg)
 	}
 	if *git {
-		cfg = loadOptionsFromConfig("/home/ankit/projects/src/github.com/47Billion/oauth2_proxy/config/github.cfg", cfg)
-		config.Oauth2Config["github"] = cfg
-		githubOAuthproxy = verifyOpts(opts, flagSet, cfg)
+		gitOpts := NewOptions()
+		gitCfg := make(EnvOptions)
+		gitCfg = loadOptionsFromConfig("config/github.cfg", gitCfg)
+		config.Oauth2Config["github"] = gitCfg
+		githubOAuthproxy = verifyOpts(gitOpts, flagSet, gitCfg)
 	}
 
 	//cfg.LoadEnvForStruct(opts)
@@ -164,7 +162,6 @@ func main() {
 
 func (a *AbstractProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	pathString := req.URL.Path;
-	fmt.Println("PATHSTRING: ", pathString)
 	var p *OAuthProxy
 	if strings.HasPrefix(pathString, "/google") {
 		p = a.oauthProxy["google"]
@@ -182,8 +179,7 @@ func (a *AbstractProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	switch path := req.URL.Path; {
 	case path == "/login":
-		fmt.Println("Inside Login CASE: ", path)
-		data, err := ioutil.ReadFile("/home/ankit/projects/src/github.com/47Billion/oauth2_proxy/html/login.html")
+		data, err := ioutil.ReadFile("assets/login.html")
 		if nil == err {
 			rw.Write(data)
 		} else {

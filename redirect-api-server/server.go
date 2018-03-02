@@ -2,10 +2,10 @@ package main
 
 import (
 	"net/http"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/apex/log"
-	"fmt"
 )
 
 const (
@@ -20,32 +20,18 @@ func main() {
 	})
 
 	// Google Redirect URL
-	router.POST("/47billion/oauth2/callback", handler)
+	router.GET("/47billion/oauth2/callback", handler)
 
-	/*// FB Redirect URL
-	router.GET("/fb/oauth2/callback", handler.Facebook)
-
-	// Github Redirect URL
-	router.GET("/github/oauth2/callback", handler.Github)*/
-
-
-	// Google Redirect URL
+	// Tile38 sample URL
 	router.POST("/tile38", tile38Handler)
 
 	router.Run(RBACServerPort)
 }
 
 func handler(c *gin.Context) {
-	var response map[string]string
-
-	err := c.BindJSON(&response)
-	if nil != err {
-		log.Errorf("handler() Unable to bind response err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
-		return
-	}
-	fmt.Printf("token= %+v", response)
-	c.JSON(200, gin.H{"msg": "ok", "token": response})
+	var token = c.Query("token")
+	fmt.Printf("token= %+v", token)
+	c.JSON(http.StatusOK, gin.H{"msg": "ok"})
 }
 
 func tile38Handler(c *gin.Context) {
@@ -58,5 +44,5 @@ func tile38Handler(c *gin.Context) {
 		return
 	}
 	fmt.Printf("token= %+v", response)
-	c.JSON(200, gin.H{"msg": "ok", "token": response})
+	c.JSON(http.StatusOK, gin.H{"msg": "ok", "token": response})
 }

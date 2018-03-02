@@ -16,60 +16,19 @@ import (
 )
 
 const (
-	// Redirect URL
-	RedirectUrl = "http://sample-test.com:9090/oauth2/callback"
-
 	// Google Client config
-	GoogleClientId = "746385050955-tpjjgjev8n34e1v6ldh161r03i0oqmlu.apps.googleusercontent.com"
-	GoogleClientSecret = "Faxj657egrO6UttoDcA_qwll"
 	GoogleTokenUrl = "https://www.googleapis.com/oauth2/v3/token"
 	GoogleUserInfoUrl = "https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token="
 	GoogleGrantType = "authorization_code"
-	GoogleRedirectUrl = "http://sample-test.com:9090/google/oauth2/callback"
 
 	// FB Client config
-	FBClientId = "2048964158685583"
-	FBClientSecret = "13ba6eca89fc45eff2d848d81cbefc78"
 	FBAccessTokenUrl = "https://graph.facebook.com/v2.12/oauth/access_token"
-	FBDebugTokenUrl = "https://graph.facebook.com/v2.12/debug_token?input_token"
 	FBGetUserUrl = "https://graph.facebook.com/v2.12/me?access_token="
-	FBRedirectUrl = "http://sample-test.com:9090/fb/oauth2/callback"
 
 	// Github Client config
-	GithubClientId = "dfce3b493e27d84d5288"
-	GithubClientSecret = "ce0cb3a3be68dda5bc8dfb8cdcf826c6c3f479fb"
 	GithubTokenUrl = "https://github.com/login/oauth/access_token"
 	GithubUserUrl = "https://api.github.com/user"
-	GithubRedirectUrl = "http://sample-test.com:9090/github/oauth2/callback"
 )
-
-/*
-func HandleCallback(c *gin.Context) {
-	var err error
-	var token []byte
-	var code = c.Query("code")
-	var state = c.Query("state")
-
-	fmt.Println("code length: ", len(code))
-	fmt.Println("state length: ", len(state))
-
-	// For Github
-	if len(code) == 20 {
-		err, token = github(code, state)
-	}
-
-	// For FB
-	if len(code) == 344 {
-		err, token = facebook(code)
-	}
-
-	if nil != err {
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!", "data": string(token)})
-}
-*/
 
 // Process oauth2 callback request for google, this will generate new access token and get user details.
 func Google(c *gin.Context) {
@@ -79,11 +38,13 @@ func Google(c *gin.Context) {
 	var code = c.Query("code")
 
 	// Create new token request data
+	googleConfig := config.Oauth2Config["google"]
+	fmt.Println("Google ClientId :- ", googleConfig["client_id"].(string))
 	tokenReq := models.GoogleTokenRequest{
 		Code:code,
-		ClientId:GoogleClientId,
-		ClientSecret: GoogleClientSecret,
-		RedirectUrl: GoogleRedirectUrl,
+		ClientId:googleConfig["client_id"].(string),
+		ClientSecret: googleConfig["client_secret"].(string),
+		RedirectUrl: googleConfig["redirect_url"].(string),
 		GrantType:  GoogleGrantType,
 	}
 
@@ -136,6 +97,12 @@ func Google(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
 		return
 	}
+	err = callbackRequest(config.CallbackUrl, tokenString)
+	if nil != err {
+		log.Errorf("Google() Unable to send JWT token at redirectURL; err=%+v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!", "token": tokenString})
 }
 
@@ -147,7 +114,11 @@ func Facebook(c *gin.Context) {
 	var code = c.Query("code")
 
 	// Generate access token
-	endpoint := fmt.Sprintf("%s?client_id=%s&redirect_uri=%s&client_secret=%s&code=%s", FBAccessTokenUrl, FBClientId, FBRedirectUrl, FBClientSecret, code)
+	fbConfig := config.Oauth2Config["fb"]
+	clientId := fbConfig["client_id"].(string)
+	redirectUrl := fbConfig["redirect_url"].(string)
+	clientSecret := fbConfig["client_secret"].(string)
+	endpoint := fmt.Sprintf("%s?client_id=%s&redirect_uri=%s&client_secret=%s&code=%s", FBAccessTokenUrl, clientId, redirectUrl, clientSecret, code)
 	err, respData := serverRequest(endpoint, "Facebook")
 	if nil != err {
 		log.Errorf("Facebook() Unable to generate token; err=%+v", err)
@@ -191,6 +162,12 @@ func Facebook(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
 		return
 	}
+	err = callbackRequest(config.CallbackUrl, tokenString)
+	if nil != err {
+		log.Errorf("Facebook() Unable to send JWT token at redirectURL; err=%+v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!", "token": tokenString})
 }
 
@@ -202,10 +179,11 @@ func Github(c *gin.Context) {
 	var state = c.Query("state")
 
 	// New request token data
+	githubConfig := config.Oauth2Config["github"]
 	token := models.GithubTokenRequest{
-		ClientId: GithubClientId,
-		ClientSecret: GithubClientSecret,
-		RedirectUrl: GithubRedirectUrl,
+		ClientId: githubConfig["client_id"].(string),
+		ClientSecret: githubConfig["client_secret"].(string),
+		RedirectUrl: githubConfig["redirect_url"].(string),
 		Code: code,
 		State: state,
 	}
@@ -218,9 +196,10 @@ func Github(c *gin.Context) {
 		return
 	}
 
+	// TODO: Need to check how we'll get response in json format.
 	// Create new user info url to fetch details using access token
 	respList := strings.Split(string(respData), "&")
-	endpoint := fmt.Sprintf("%s?%s", GithubUserUrl, respList[0])
+	endpoint := fmt.Sprintf("%s?%s", GithubUserUrl, respList[0]) // splitting the response and using access token here.
 	err, resp := serverRequest(endpoint, "Github")
 	if nil != err {
 		log.Errorf("Github() Unable to fetch user details; err=%+v", err)
@@ -250,8 +229,7 @@ func Github(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
 		return
 	}
-	tokenMap := map[string]string{"token": tokenString}
-	err = redirectRequest(config.ThirdPartyUrl, tokenMap)
+	err = callbackRequest(config.CallbackUrl, tokenString)
 	if nil != err {
 		log.Errorf("Github() Unable to send JWT token at redirectURL; err=%+v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})

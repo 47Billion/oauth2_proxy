@@ -5,15 +5,16 @@ import (
 	"encoding/json"
 	"net/url"
 	"bytes"
+	"fmt"
 	"io/ioutil"
 
 	"github.com/47Billion/oauth2_proxy/api-server/models"
 
 	"github.com/sethgrid/pester"
 	"github.com/apex/log"
-	"fmt"
 )
 
+// Create's access token for google POST call
 func createGoogleAccessToken(endpoint string, reqData models.GoogleTokenRequest) (err error, respData []byte) {
 	// Client
 	client := pester.New()
@@ -52,6 +53,7 @@ func createGoogleAccessToken(endpoint string, reqData models.GoogleTokenRequest)
 	return
 }
 
+// Create's access token for github POST call
 func createGithubAccessToken(endpoint string, reqData models.GithubTokenRequest) (err error, respData []byte) {
 	// Client
 	client := pester.New()
@@ -88,6 +90,7 @@ func createGithubAccessToken(endpoint string, reqData models.GithubTokenRequest)
 	return
 }
 
+// Common request handler that will handle all get requests. FB gives token with a GET call.
 func serverRequest(endpoint, provider string) (err error, respData []byte) {
 	// Client
 	client := pester.New()
@@ -114,34 +117,31 @@ func serverRequest(endpoint, provider string) (err error, respData []byte) {
 	return
 }
 
-func redirectRequest(endpoint string, token map[string]string) (err error) {
+// Callback request handler that will redirect our internal token to the callback URL.
+func callbackRequest(endpoint, tokenString string) (err error) {
 	// Client
 	client := pester.New()
 	client.KeepLog = true
 
-	data, err := json.Marshal(token)
-	if nil != err {
-		log.Errorf("redirectRequest() Unable to marshal request data err=%+v", err)
-		return
-	}
+	url := fmt.Sprintf("%s?token=%s", endpoint, tokenString)
 
-	// New Request object
-	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(data))
+	// Response
 	var resp *http.Response
-	resp, err = client.Do(req)
+	resp, err = client.Get(url)
 	if nil != err {
-		log.Errorf("redirectRequest() Unable to call token API err=%+v", err)
+		log.Errorf("callbackRequest() Unable to call token API err=%+v", err)
 		return
 	}
 
+	// read response and check statusCode.
 	status := resp.StatusCode
 	respData, err := ioutil.ReadAll(resp.Body)
 	if nil != err {
-		log.Errorf("redirectRequest() Unable to read response err=%+v", err)
+		log.Errorf("callbackRequest() Unable to read response err=%+v", err)
 		return
 	} else if status != 200 {
-		log.Errorf("redirectRequest() something went wrong statusCode=%d, msg=%s", status, string(respData))
-
+		log.Errorf("callbackRequest() something went wrong statusCode=%d, msg=%s", status, string(respData))
+		err = fmt.Errorf("Something went wrong while sending response token at url=%s", endpoint)
 	}
 	return
 }
