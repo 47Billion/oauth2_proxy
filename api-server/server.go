@@ -26,5 +26,8 @@ func StartServer() {
 	// Github Redirect URL
 	router.GET("/github/oauth2/callback", handler.Github)
 
+	// Linkedin Redirect URL
+	router.GET("/linkedin/oauth2/callback", handler.Linkedin)
+
 	router.Run(RBACServerPort)
 }

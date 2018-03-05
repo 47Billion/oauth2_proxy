@@ -95,6 +95,7 @@ func main() {
 	google := flagSet.Bool("google", false, "Provides Oauth2 service for google")
 	fb := flagSet.Bool("fb", false, "Provides Oauth2 service for facebook")
 	git := flagSet.Bool("github", false, "Provides Oauth2 service for github")
+	linkedin := flagSet.Bool("linkedin", false, "Provides Oauth2 service for linkedin")
 	callbackUrl := flagSet.String("callback-url", "", "the OAuth Redirect URL. ie: \"https://internalapp.yourcompany.com/oauth2/callback\"")
 
 	flagSet.Parse(os.Args[1:])
@@ -110,7 +111,7 @@ func main() {
 	}
 
 	opts := NewOptions()
-	var googleOAuthproxy, fbOAuthproxy, githubOAuthproxy *OAuthProxy
+	var googleOAuthproxy, fbOAuthproxy, githubOAuthproxy, linkedinOAuthproxy *OAuthProxy
 
 	if *google {
 		googleOpts := NewOptions()
@@ -133,6 +134,13 @@ func main() {
 		config.Oauth2Config["github"] = gitCfg
 		githubOAuthproxy = verifyOpts(gitOpts, flagSet, gitCfg)
 	}
+	if *linkedin {
+		linkedinOpts := NewOptions()
+		linkedinCfg := make(EnvOptions)
+		linkedinCfg = loadOptionsFromConfig("config/linkedin.cfg", linkedinCfg)
+		config.Oauth2Config["linkedin"] = linkedinCfg
+		linkedinOAuthproxy = verifyOpts(linkedinOpts, flagSet, linkedinCfg)
+	}
 
 	//cfg.LoadEnvForStruct(opts)
 
@@ -143,6 +151,7 @@ func main() {
 			"google": googleOAuthproxy,
 			"fb": fbOAuthproxy,
 			"github": githubOAuthproxy,
+			"linkedin": linkedinOAuthproxy,
 		},
 		serveMux: serveMux,
 	}
@@ -169,6 +178,8 @@ func (a *AbstractProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		p = a.oauthProxy["fb"]
 	} else if strings.HasPrefix(pathString, "/github") {
 		p = a.oauthProxy["github"]
+	} else if strings.HasPrefix(pathString, "/linkedin") {
+		p = a.oauthProxy["linkedin"]
 	}
 
 	if p == nil && req.URL.Path != "/login" {

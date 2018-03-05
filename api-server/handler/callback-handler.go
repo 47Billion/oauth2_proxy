@@ -7,27 +7,31 @@ import (
 	"encoding/json"
 	"strconv"
 
+	"github.com/47Billion/oauth2_proxy/config"
 	"github.com/47Billion/oauth2_proxy/api-server/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/apex/log"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/47Billion/oauth2_proxy/config"
 )
 
 const (
-	// Google Client config
+	// Google Urls
 	GoogleTokenUrl = "https://www.googleapis.com/oauth2/v3/token"
 	GoogleUserInfoUrl = "https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token="
 	GoogleGrantType = "authorization_code"
 
-	// FB Client config
+	// FB Urls
 	FBAccessTokenUrl = "https://graph.facebook.com/v2.12/oauth/access_token"
 	FBGetUserUrl = "https://graph.facebook.com/v2.12/me?access_token="
 
-	// Github Client config
+	// Github Urls
 	GithubTokenUrl = "https://github.com/login/oauth/access_token"
 	GithubUserUrl = "https://api.github.com/user"
+
+	// Linkedin Urls
+	LinkedinTokenUrl = "https://www.linkedin.com/oauth/v2/accessToken"
+	LinkedinUserInfoUrl = "https://api.linkedin.com/v1/people/~?format=json"
 )
 
 // Process oauth2 callback request for google, this will generate new access token and get user details.
@@ -39,8 +43,7 @@ func Google(c *gin.Context) {
 
 	// Create new token request data
 	googleConfig := config.Oauth2Config["google"]
-	fmt.Println("Google ClientId :- ", googleConfig["client_id"].(string))
-	tokenReq := models.GoogleTokenRequest{
+	tokenReq := models.GoogleLinkedinTokenRequest{
 		Code:code,
 		ClientId:googleConfig["client_id"].(string),
 		ClientSecret: googleConfig["client_secret"].(string),
@@ -49,7 +52,7 @@ func Google(c *gin.Context) {
 	}
 
 	// Create new access token
-	err, respData := createGoogleAccessToken(GoogleTokenUrl, tokenReq)
+	err, respData := createGoogleLinkedinToken(GoogleTokenUrl, tokenReq)
 	if nil != err {
 		log.Errorf("Google() Unable to generate token for Google with code=%s; err=%+v", code, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
@@ -103,7 +106,7 @@ func Google(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!", "token": tokenString})
+	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!"})
 }
 
 // Process oauth2 callback request for facebook, this will generate new access token and get user details.
@@ -168,7 +171,7 @@ func Facebook(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!", "token": tokenString})
+	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!"})
 }
 
 // Process oauth2 callback request for github, this will generate new access token and get user details.
@@ -214,8 +217,7 @@ func Github(c *gin.Context) {
 		return
 	}
 
-	log.Infof("User Details: %+v", gitUserInfo)
-	id := strconv.FormatInt(gitUserInfo.Id, 10)
+	id := strconv.FormatInt(gitUserInfo.Id, 10) // TODO: getting id in int format, need to convert it  or not?
 	redirectResponse := models.RedirectResponse{
 		Id:id,
 		Name:gitUserInfo.Name,
@@ -235,7 +237,78 @@ func Github(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!", "token": tokenString})
+	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!"})
+}
+
+// Process oauth2 callback request for github, this will generate new access token and get user details.
+func Linkedin(c *gin.Context) {
+	var tokenResponse models.LinkedinTokenResp
+	var userInfo models.LinkedinUserInfo
+	var err error
+	var code = c.Query("code")
+
+	// New access token request data
+	linkedinConfig := config.Oauth2Config["linkedin"]
+	token := models.GoogleLinkedinTokenRequest{
+		ClientId: linkedinConfig["client_id"].(string),
+		ClientSecret: linkedinConfig["client_secret"].(string),
+		RedirectUrl: linkedinConfig["redirect_url"].(string),
+		Code: code,
+		GrantType:"authorization_code",
+	}
+
+	// Create new access token
+	err, respData := createGoogleLinkedinToken(LinkedinTokenUrl, token)
+	if nil != err {
+		log.Errorf("Linkedin() Unable to generate token for Google with code=%s; err=%+v", code, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		return
+	}
+
+	// Unmarshal token response data
+	err = json.Unmarshal(respData, &tokenResponse)
+	if nil != err {
+		log.Errorf("Linkedin() Unable to unmarshal token response data err=%+v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		return
+	}
+
+	log.Infof("tokenResponse.AccessToken - %s", tokenResponse.AccessToken)
+
+	// Get user details using access token
+	err, userResp := getLinkedinUserInfo(LinkedinUserInfoUrl, tokenResponse.AccessToken)
+	if nil != err {
+		log.Errorf("Linkedin() Unable to fetch user details; err=%+v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		return
+	}
+
+	err = json.Unmarshal(userResp, &userInfo)
+	if nil != err {
+		log.Errorf("Linkedin() Unable to unmarshal user info data; err=%+v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		return
+	}
+
+	log.Infof("User Details: %+v", userInfo)
+	name := fmt.Sprintf("%s %s", userInfo.FirstName, userInfo.LastName)
+	redirectResponse := models.RedirectResponse{
+		Id:userInfo.Id,
+		Name:name,
+	}
+	err, tokenString := createJWTToken(redirectResponse)
+	if nil != err {
+		log.Errorf("Linkedin() Unable to create JWT token; err=%+v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		return
+	}
+	err = callbackRequest(config.CallbackUrl, tokenString)
+	if nil != err {
+		log.Errorf("Linkedin() Unable to send JWT token at redirectURL; err=%+v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!"})
 }
 
 func createJWTToken(data interface{}) (err error, tokenString string) {
@@ -249,6 +322,5 @@ func createJWTToken(data interface{}) (err error, tokenString string) {
 		log.Errorf("createJWTToken() Unable to create JWT token; err=%+v", err)
 		return
 	}
-	fmt.Println(tokenString, err)
 	return
 }

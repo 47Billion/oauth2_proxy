@@ -14,8 +14,8 @@ import (
 	"github.com/apex/log"
 )
 
-// Create's access token for google POST call
-func createGoogleAccessToken(endpoint string, reqData models.GoogleTokenRequest) (err error, respData []byte) {
+// Create's access token for google and linkedin POST call
+func createGoogleLinkedinToken(endpoint string, reqData models.GoogleLinkedinTokenRequest) (err error, respData []byte) {
 	// Client
 	client := pester.New()
 	client.KeepLog = true
@@ -36,7 +36,7 @@ func createGoogleAccessToken(endpoint string, reqData models.GoogleTokenRequest)
 	var resp *http.Response
 	resp, err = http.DefaultClient.Do(req)
 	if nil != err {
-		log.Errorf("createGoogleAccessToken() Unable to call token API err=%+v", err)
+		log.Errorf("createGoogleLinkedinToken() Unable to call token API err=%+v", err)
 		return
 	}
 
@@ -44,11 +44,11 @@ func createGoogleAccessToken(endpoint string, reqData models.GoogleTokenRequest)
 	status := resp.StatusCode
 	respData, err = ioutil.ReadAll(resp.Body)
 	if nil != err {
-		log.Errorf("createGoogleAccessToken() Unable to read response err=%+v", err)
+		log.Errorf("createGoogleLinkedinToken() Unable to read response err=%+v", err)
 		return
 	} else if status != 200 {
-		log.Errorf("createGoogleAccessToken() something went wrong statusCode=%d, msg=%s", status, string(respData))
-		err = fmt.Errorf("createGoogleAccessToken() something went wrong statusCode=%d, msg=%s", status, string(respData))
+		log.Errorf("createGoogleLinkedinToken() something went wrong statusCode=%d, msg=%s", status, string(respData))
+		err = fmt.Errorf("createGoogleLinkedinToken() something went wrong statusCode=%d, msg=%s", status, string(respData))
 	}
 	return
 }
@@ -113,6 +113,37 @@ func serverRequest(endpoint, provider string) (err error, respData []byte) {
 	} else if status != 200 {
 		log.Errorf("serverRequest() something went wrong endpoint=%s, statusCode=%d, msg=%s", endpoint, status, string(respData))
 		err = fmt.Errorf("serverRequest() something went wrong endpoint=%s, statusCode=%d, msg=%s", endpoint, status, string(respData))
+	}
+	return
+}
+
+func getLinkedinUserInfo(endpoint, token string) (err error, respData []byte) {
+	// Client
+	client := pester.New()
+	client.KeepLog = true
+
+	// New GET Request and setting auth header.
+	req, err := http.NewRequest("GET", endpoint, nil)
+	authHeaderVal := fmt.Sprintf("Bearer %s", token)
+	req.Header.Set("Authorization", authHeaderVal)
+
+	// Response
+	var resp *http.Response
+	resp, err = client.Do(req)
+	if nil != err {
+		log.Errorf("getLinkedinUserInfo() Unable to call Linkedin server for endpoint=%s; err=%+v", endpoint, err)
+		return
+	}
+
+	// Read response body data
+	status := resp.StatusCode
+	respData, err = ioutil.ReadAll(resp.Body)
+	if nil != err {
+		log.Errorf("getLinkedinUserInfo() Unable to read response of endpoint=%s; err=%+v", endpoint, err)
+		return
+	} else if status != 200 {
+		log.Errorf("getLinkedinUserInfo() something went wrong endpoint=%s, statusCode=%d, msg=%s", endpoint, status, string(respData))
+		err = fmt.Errorf("getLinkedinUserInfo() something went wrong endpoint=%s, statusCode=%d, msg=%s", endpoint, status, string(respData))
 	}
 	return
 }

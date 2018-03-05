@@ -28,7 +28,7 @@ type FBTokenResp struct {
 	TokenType   string `json:"token_type"`
 }
 
-type GoogleTokenRequest struct {
+type GoogleLinkedinTokenRequest struct {
 	ClientId     string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
 	RedirectUrl  string `json:"redirect_url"`
@@ -41,6 +41,11 @@ type GoogleTokenResp struct {
 	ExpiresIn    int64 `json:"expires_in"`
 	TokenType    string `json:"token_type"`
 	RefreshToken string `json:"refresh_token"`
+}
+
+type LinkedinTokenResp struct {
+	AccessToken string `json:"access_token"`
+	ExpiresIn   int64 `json:"expires_in"`
 }
 
 type RedirectResponse struct {
@@ -98,4 +103,11 @@ type GitUserInfo struct {
 	StarredUrl       string `json:"starred_url"`
 	Login            string `json:"login"`
 	GistsUrl         string `json:"gists_url"`
+}
+
+type LinkedinUserInfo struct {
+	Id        string `json:"id"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	HeadLine  string `json:"headline"`
 }
