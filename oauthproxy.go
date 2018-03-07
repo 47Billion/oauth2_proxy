@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/47Billion/oauth2_proxy/cookie"
-	"github.com/47Billion/oauth2_proxy/providers"
+	"github.com/bitly/oauth2_proxy/cookie"
+	"github.com/bitly/oauth2_proxy/providers"
 	"github.com/mbland/hmacauth"
 )
 
@@ -35,23 +35,23 @@ var SignatureHeaders []string = []string{
 }
 
 type OAuthProxy struct {
-	CookieSeed     string
-	CookieName     string
-	CSRFCookieName string
-	CookieDomain   string
-	CookieSecure   bool
-	CookieHttpOnly bool
-	CookieExpire   time.Duration
-	CookieRefresh  time.Duration
-	Validator      func(string) bool
+	CookieSeed          string
+	CookieName          string
+	CSRFCookieName      string
+	CookieDomain        string
+	CookieSecure        bool
+	CookieHttpOnly      bool
+	CookieExpire        time.Duration
+	CookieRefresh       time.Duration
+	Validator           func(string) bool
 
-	RobotsPath        string
-	PingPath          string
-	SignInPath        string
-	SignOutPath       string
-	OAuthStartPath    string
-	OAuthCallbackPath string
-	AuthOnlyPath      string
+	RobotsPath          string
+	PingPath            string
+	SignInPath          string
+	SignOutPath         string
+	OAuthStartPath      string
+	OAuthCallbackPath   string
+	AuthOnlyPath        string
 
 	redirectURL         *url.URL // the url to receive requests at
 	provider            providers.Provider
@@ -292,7 +292,7 @@ func (p *OAuthProxy) makeCookie(req *http.Request, name string, value string, ex
 }
 
 func (p *OAuthProxy) ClearCSRFCookie(rw http.ResponseWriter, req *http.Request) {
-	http.SetCookie(rw, p.MakeCSRFCookie(req, "", time.Hour*-1, time.Now()))
+	http.SetCookie(rw, p.MakeCSRFCookie(req, "", time.Hour * -1, time.Now()))
 }
 
 func (p *OAuthProxy) SetCSRFCookie(rw http.ResponseWriter, req *http.Request, val string) {
@@ -300,7 +300,7 @@ func (p *OAuthProxy) SetCSRFCookie(rw http.ResponseWriter, req *http.Request, va
 }
 
 func (p *OAuthProxy) ClearSessionCookie(rw http.ResponseWriter, req *http.Request) {
-	clr := p.MakeSessionCookie(req, "", time.Hour*-1, time.Now())
+	clr := p.MakeSessionCookie(req, "", time.Hour * -1, time.Now())
 	http.SetCookie(rw, clr)
 
 	// ugly hack because default domain changed

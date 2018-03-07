@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/47Billion/oauth2_proxy/api-server/models"
+	"github.com/bitly/oauth2_proxy/api-server/models"
 
 	"github.com/sethgrid/pester"
 	"github.com/apex/log"

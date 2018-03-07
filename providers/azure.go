@@ -3,8 +3,8 @@ package providers
 import (
 	"errors"
 	"fmt"
-	"github.com/47Billion/go-simplejson"
-	"github.com/47Billion/oauth2_proxy/api"
+	"github.com/bitly/go-simplejson"
+	"github.com/bitly/oauth2_proxy/api"
 	"log"
 	"net/http"
 	"net/url"

@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/47Billion/go-simplejson"
+	"github.com/bitly/go-simplejson"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"

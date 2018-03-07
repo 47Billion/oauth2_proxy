@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 	"net/http"
+	"io/ioutil"
 
-	"github.com/47Billion/oauth2_proxy/config"
+	"github.com/bitly/oauth2_proxy/api-server/handler"
+	"github.com/bitly/oauth2_proxy/config"
 
 	"github.com/BurntSushi/toml"
 	"github.com/mreiferson/go-options"
-	"io/ioutil"
-	"github.com/47Billion/oauth2_proxy/api-server"
 )
 
 type AbstractProxy struct {
@@ -97,6 +97,7 @@ func main() {
 	git := flagSet.Bool("github", false, "Provides Oauth2 service for github")
 	linkedin := flagSet.Bool("linkedin", false, "Provides Oauth2 service for linkedin")
 	callbackUrl := flagSet.String("callback-url", "", "the OAuth Redirect URL. ie: \"https://internalapp.yourcompany.com/oauth2/callback\"")
+	customLoginTemplate := flagSet.String("custom-login-template", "", "path to custom login html template")
 
 	flagSet.Parse(os.Args[1:])
 
@@ -105,9 +106,18 @@ func main() {
 		return
 	}
 
-	// TODO : What if callbackUrl is empty, need to exit from system?
-	if *callbackUrl != "" {
+	if *callbackUrl == "" {
+		fmt.Printf("Invalid configuration:\n%s\n", "missing setting: callback-url")
+		os.Exit(0)
+
+	} else {
 		config.CallbackUrl = *callbackUrl
+	}
+	if *customLoginTemplate == "" {
+		fmt.Printf("Invalid configuration:\n%s\n", "missing setting: custom-login-template")
+		os.Exit(0)
+	} else {
+		config.SigninTemplate = *customLoginTemplate
 	}
 
 	opts := NewOptions()
@@ -117,6 +127,8 @@ func main() {
 		googleOpts := NewOptions()
 		googleCfg := make(EnvOptions)
 		googleCfg = loadOptionsFromConfig("config/google.cfg", googleCfg)
+		googleCfg["redirect_url"] = fmt.Sprintf("%s%s/callback", googleCfg["base_url"], googleCfg["proxy-prefix"])
+		fmt.Println("Redirect Url: ", googleCfg["redirect_url"])
 		config.Oauth2Config["google"] = googleCfg
 		googleOAuthproxy = verifyOpts(googleOpts, flagSet, googleCfg)
 	}
@@ -124,6 +136,8 @@ func main() {
 		fbOpts := NewOptions()
 		fbCfg := make(EnvOptions)
 		fbCfg = loadOptionsFromConfig("config/facebook.cfg", fbCfg)
+		fbCfg["redirect_url"] = fmt.Sprintf("%s%s/callback", fbCfg["base_url"], fbCfg["proxy-prefix"])
+		fmt.Println("Redirect Url: ", fbCfg["redirect_url"])
 		config.Oauth2Config["fb"] = fbCfg
 		fbOAuthproxy = verifyOpts(fbOpts, flagSet, fbCfg)
 	}
@@ -131,6 +145,8 @@ func main() {
 		gitOpts := NewOptions()
 		gitCfg := make(EnvOptions)
 		gitCfg = loadOptionsFromConfig("config/github.cfg", gitCfg)
+		gitCfg["redirect_url"] = fmt.Sprintf("%s%s/callback", gitCfg["base_url"], gitCfg["proxy-prefix"])
+		fmt.Println("Redirect Url: ", gitCfg["redirect_url"])
 		config.Oauth2Config["github"] = gitCfg
 		githubOAuthproxy = verifyOpts(gitOpts, flagSet, gitCfg)
 	}
@@ -138,12 +154,11 @@ func main() {
 		linkedinOpts := NewOptions()
 		linkedinCfg := make(EnvOptions)
 		linkedinCfg = loadOptionsFromConfig("config/linkedin.cfg", linkedinCfg)
+		linkedinCfg["redirect_url"] = fmt.Sprintf("%s%s/callback", linkedinCfg["base_url"], linkedinCfg["proxy-prefix"])
+		fmt.Println("Redirect Url: ", linkedinCfg["redirect_url"])
 		config.Oauth2Config["linkedin"] = linkedinCfg
 		linkedinOAuthproxy = verifyOpts(linkedinOpts, flagSet, linkedinCfg)
 	}
-
-	//cfg.LoadEnvForStruct(opts)
-
 
 	serveMux := http.NewServeMux()
 	abstractProxy := &AbstractProxy{
@@ -156,16 +171,10 @@ func main() {
 		serveMux: serveMux,
 	}
 
-	//s := &Server{
-	//	Handler: LoggingHandler(os.Stdout, oauthproxy, opts.RequestLogging, opts.RequestLoggingFormat),
-	//	Opts:    opts,
-	//}
-
 	s := &Server{
 		Handler: LoggingHandler(os.Stdout, abstractProxy, opts.RequestLogging, opts.RequestLoggingFormat),
 		Opts:    opts,
 	}
-	go api_server.StartServer()
 	s.ListenAndServe()
 }
 
@@ -190,13 +199,21 @@ func (a *AbstractProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	switch path := req.URL.Path; {
 	case path == "/login":
-		data, err := ioutil.ReadFile("assets/login.html")
+		data, err := ioutil.ReadFile(config.SigninTemplate)
 		if nil == err {
 			rw.Write(data)
 		} else {
 			rw.WriteHeader(404)
 			rw.Write([]byte("404 Something went wrong - " + http.StatusText(404)))
 		}
+	case path == "/google/oauth2/callback":
+		handler.Google(rw, req)        // handle Google callback request
+	case path == "/fb/oauth2/callback":
+		handler.Facebook(rw, req)        // handle Facebook callback request
+	case path == "/github/oauth2/callback":
+		handler.Github(rw, req)         // handle Github callback request
+	case path == "/linkedin/oauth2/callback":
+		handler.Linkedin(rw, req)         // handle Linkedin callback request
 	case path == p.RobotsPath:
 		p.RobotsTxt(rw)
 	case path == p.PingPath:

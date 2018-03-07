@@ -1,6 +1,8 @@
 package models
 
-import "time"
+import (
+	"time"
+)
 
 type TokenResponse struct {
 	AccessToken string `json:"access_token"`

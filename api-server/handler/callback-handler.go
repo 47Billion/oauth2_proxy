@@ -7,10 +7,9 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/47Billion/oauth2_proxy/config"
-	"github.com/47Billion/oauth2_proxy/api-server/models"
+	"github.com/bitly/oauth2_proxy/config"
+	"github.com/bitly/oauth2_proxy/api-server/models"
 
-	"github.com/gin-gonic/gin"
 	"github.com/apex/log"
 	"github.com/dgrijalva/jwt-go"
 )
@@ -35,11 +34,11 @@ const (
 )
 
 // Process oauth2 callback request for google, this will generate new access token and get user details.
-func Google(c *gin.Context) {
+func Google(rw http.ResponseWriter, req *http.Request) {
 	var tokenResponse models.GoogleTokenResp
 	var userInfo models.GoogleUserInfo
 	var err error
-	var code = c.Query("code")
+	var code = req.URL.Query().Get("code")  //c.Query("code")
 
 	// Create new token request data
 	googleConfig := config.Oauth2Config["google"]
@@ -55,7 +54,7 @@ func Google(c *gin.Context) {
 	err, respData := createGoogleLinkedinToken(GoogleTokenUrl, tokenReq)
 	if nil != err {
 		log.Errorf("Google() Unable to generate token for Google with code=%s; err=%+v", code, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -63,7 +62,7 @@ func Google(c *gin.Context) {
 	err = json.Unmarshal(respData, &tokenResponse)
 	if nil != err {
 		log.Errorf("Google() Unable to unmarshal token response data err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -74,16 +73,15 @@ func Google(c *gin.Context) {
 	err, userInfoBytes := serverRequest(userInfoEndpoint, "Google")
 	if nil != err {
 		log.Errorf("Google() Unable to fetch user details; err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	log.Infof("Google User Info : %s", string(userInfoBytes))
 
 	// Unmarshal token response data
 	err = json.Unmarshal(userInfoBytes, &userInfo)
 	if nil != err {
 		log.Errorf("Google() Unable to unmarshal user info data; err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	redirectResponse := models.RedirectResponse{
@@ -97,24 +95,25 @@ func Google(c *gin.Context) {
 	err, tokenString := createJWTToken(redirectResponse)
 	if nil != err {
 		log.Errorf("Google() Unable to create JWT token; err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	err = callbackRequest(config.CallbackUrl, tokenString)
 	if nil != err {
 		log.Errorf("Google() Unable to send JWT token at redirectURL; err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!"})
+	rw.Header().Set("Content-Type", "application/json")
+	rw.Write([]byte(`"msg: "All Ok!!!"`))
 }
 
 // Process oauth2 callback request for facebook, this will generate new access token and get user details.
-func Facebook(c *gin.Context) {
+func Facebook(rw http.ResponseWriter, req *http.Request) {
 	var fbToken models.FBTokenResp
 	var userInfo models.FBUserInfo
 	var err error
-	var code = c.Query("code")
+	var code = req.URL.Query().Get("code")
 
 	// Generate access token
 	fbConfig := config.Oauth2Config["fb"]
@@ -125,34 +124,31 @@ func Facebook(c *gin.Context) {
 	err, respData := serverRequest(endpoint, "Facebook")
 	if nil != err {
 		log.Errorf("Facebook() Unable to generate token; err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	log.Infof("Facebook() response: %s", string(respData))
 	err = json.Unmarshal(respData, &fbToken)
 	if nil != err {
 		log.Errorf("Facebook() Unable to unmarshal response data err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Use access token to get user name and user_id
 	userInfoUrl := fmt.Sprintf("%s%s", FBGetUserUrl, fbToken.AccessToken)
-	log.Infof("Facebook() Debug Token URL: %s", userInfoUrl)
 	err, userInfoBytes := serverRequest(userInfoUrl, "Facebook")
 	if nil != err {
 		log.Errorf("Facebook() Unable to fetch user details; err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	log.Infof("Facebook() tokenResp: %s", string(userInfoBytes))
 
 	// Unmarshal token response data
 	err = json.Unmarshal(userInfoBytes, &userInfo)
 	if nil != err {
 		log.Errorf("Facebook() Unable to unmarshal user info data; err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	redirectResponse := models.RedirectResponse{
@@ -162,24 +158,25 @@ func Facebook(c *gin.Context) {
 	err, tokenString := createJWTToken(redirectResponse)
 	if nil != err {
 		log.Errorf("Facebook() Unable to create JWT token; err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	err = callbackRequest(config.CallbackUrl, tokenString)
 	if nil != err {
 		log.Errorf("Facebook() Unable to send JWT token at redirectURL; err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!"})
+	rw.Header().Set("Content-Type", "application/json")
+	rw.Write([]byte(`"msg: "All Ok!!!"`))
 }
 
 // Process oauth2 callback request for github, this will generate new access token and get user details.
-func Github(c *gin.Context) {
+func Github(rw http.ResponseWriter, req *http.Request) {
 	var gitUserInfo models.GitUserInfo
 	var err error
-	var code = c.Query("code")
-	var state = c.Query("state")
+	var code = req.URL.Query().Get("code")
+	var state = req.URL.Query().Get("state")
 
 	// New request token data
 	githubConfig := config.Oauth2Config["github"]
@@ -195,7 +192,7 @@ func Github(c *gin.Context) {
 	err, respData := createGithubAccessToken(GithubTokenUrl, token)
 	if nil != err {
 		log.Errorf("Github() Unable to generate access token; err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -206,18 +203,18 @@ func Github(c *gin.Context) {
 	err, resp := serverRequest(endpoint, "Github")
 	if nil != err {
 		log.Errorf("Github() Unable to fetch user details; err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	err = json.Unmarshal(resp, &gitUserInfo)
 	if nil != err {
 		log.Errorf("Github() Unable to unmarshal user info data; err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	id := strconv.FormatInt(gitUserInfo.Id, 10) // TODO: getting id in int format, need to convert it  or not?
+	id := strconv.FormatInt(gitUserInfo.Id, 10) // TODO: getting id in int format, need to convert it or not?
 	redirectResponse := models.RedirectResponse{
 		Id:id,
 		Name:gitUserInfo.Name,
@@ -228,24 +225,25 @@ func Github(c *gin.Context) {
 	err, tokenString := createJWTToken(redirectResponse)
 	if nil != err {
 		log.Errorf("Github() Unable to create JWT token; err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	err = callbackRequest(config.CallbackUrl, tokenString)
 	if nil != err {
 		log.Errorf("Github() Unable to send JWT token at redirectURL; err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!"})
+	rw.Header().Set("Content-Type", "application/json")
+	rw.Write([]byte(`"msg: "All Ok!!!"`))
 }
 
 // Process oauth2 callback request for github, this will generate new access token and get user details.
-func Linkedin(c *gin.Context) {
+func Linkedin(rw http.ResponseWriter, req *http.Request) {
 	var tokenResponse models.LinkedinTokenResp
 	var userInfo models.LinkedinUserInfo
 	var err error
-	var code = c.Query("code")
+	var code = req.URL.Query().Get("code")
 
 	// New access token request data
 	linkedinConfig := config.Oauth2Config["linkedin"]
@@ -261,7 +259,7 @@ func Linkedin(c *gin.Context) {
 	err, respData := createGoogleLinkedinToken(LinkedinTokenUrl, token)
 	if nil != err {
 		log.Errorf("Linkedin() Unable to generate token for Google with code=%s; err=%+v", code, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -269,24 +267,22 @@ func Linkedin(c *gin.Context) {
 	err = json.Unmarshal(respData, &tokenResponse)
 	if nil != err {
 		log.Errorf("Linkedin() Unable to unmarshal token response data err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	log.Infof("tokenResponse.AccessToken - %s", tokenResponse.AccessToken)
 
 	// Get user details using access token
 	err, userResp := getLinkedinUserInfo(LinkedinUserInfoUrl, tokenResponse.AccessToken)
 	if nil != err {
 		log.Errorf("Linkedin() Unable to fetch user details; err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	err = json.Unmarshal(userResp, &userInfo)
 	if nil != err {
 		log.Errorf("Linkedin() Unable to unmarshal user info data; err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -299,16 +295,17 @@ func Linkedin(c *gin.Context) {
 	err, tokenString := createJWTToken(redirectResponse)
 	if nil != err {
 		log.Errorf("Linkedin() Unable to create JWT token; err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	err = callbackRequest(config.CallbackUrl, tokenString)
 	if nil != err {
 		log.Errorf("Linkedin() Unable to send JWT token at redirectURL; err=%+v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": err.Error()})
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"msg": "All Ok!!!"})
+	rw.Header().Set("Content-Type", "application/json")
+	rw.Write([]byte(`"msg: "All Ok!!!"`))
 }
 
 func createJWTToken(data interface{}) (err error, tokenString string) {

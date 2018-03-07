@@ -1,7 +1,7 @@
 package api_server
 
 import (
-	"github.com/47Billion/oauth2_proxy/api-server/handler"
+	"github.com/bitly/oauth2_proxy/api-server/handler"
 
 	"github.com/gin-gonic/gin"
 )
