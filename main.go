@@ -92,7 +92,7 @@ func main() {
 	flagSet.String("signature-key", "", "GAP-Signature request signature key (algorithm:secretkey)")
 
 	// Added by Ankit
-	google := flagSet.Bool("google", false, "Provides Oauth2 service for google")
+	google := flagSet.Bool("google", true, "Provides Oauth2 service for google")
 	fb := flagSet.Bool("fb", false, "Provides Oauth2 service for facebook")
 	git := flagSet.Bool("github", false, "Provides Oauth2 service for github")
 	linkedin := flagSet.Bool("linkedin", false, "Provides Oauth2 service for linkedin")
