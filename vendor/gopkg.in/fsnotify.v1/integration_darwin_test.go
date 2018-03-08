@@ -7,15 +7,14 @@ package fsnotify
 import (
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
-
-	"golang.org/x/sys/unix"
 )
 
-// testExchangedataForWatcher tests the watcher with the exchangedata operation on macOS.
+// testExchangedataForWatcher tests the watcher with the exchangedata operation on OS X.
 //
-// This is widely used for atomic saves on macOS, e.g. TextMate and in Apple's NSDocument.
+// This is widely used for atomic saves on OS X, e.g. TextMate and in Apple's NSDocument.
 //
 // See https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/exchangedata.2.html
 // Also see: https://github.com/textmate/textmate/blob/cd016be29489eba5f3c09b7b70b06da134dda550/Frameworks/io/src/swap_file_data.cc#L20
@@ -88,7 +87,7 @@ func testExchangedataForWatcher(t *testing.T, watchDir bool) {
 		createAndSyncFile(t, intermediate)
 
 		// 1. Swap
-		if err := unix.Exchangedata(intermediate, resolved, 0); err != nil {
+		if err := syscall.Exchangedata(intermediate, resolved, 0); err != nil {
 			t.Fatalf("[%d] exchangedata failed: %s", i, err)
 		}
 

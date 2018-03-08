@@ -13,7 +13,7 @@ import (
 	"errors"
 )
 
-// Message formats
+// Packet formats
 
 // A Type is a type of DNS request and response.
 type Type uint16
@@ -436,13 +436,7 @@ func (p *Parser) Question() (Question, error) {
 
 // AllQuestions parses all Questions.
 func (p *Parser) AllQuestions() ([]Question, error) {
-	// Multiple questions are valid according to the spec,
-	// but servers don't actually support them. There will
-	// be at most one question here.
-	//
-	// Do not pre-allocate based on info in p.header, since
-	// the data is untrusted.
-	qs := []Question{}
+	qs := make([]Question, 0, p.header.questions)
 	for {
 		q, err := p.Question()
 		if err == ErrSectionDone {
@@ -498,16 +492,7 @@ func (p *Parser) Answer() (Resource, error) {
 
 // AllAnswers parses all Answer Resources.
 func (p *Parser) AllAnswers() ([]Resource, error) {
-	// The most common query is for A/AAAA, which usually returns
-	// a handful of IPs.
-	//
-	// Pre-allocate up to a certain limit, since p.header is
-	// untrusted data.
-	n := int(p.header.answers)
-	if n > 20 {
-		n = 20
-	}
-	as := make([]Resource, 0, n)
+	as := make([]Resource, 0, p.header.answers)
 	for {
 		a, err := p.Answer()
 		if err == ErrSectionDone {
@@ -548,16 +533,7 @@ func (p *Parser) Authority() (Resource, error) {
 
 // AllAuthorities parses all Authority Resources.
 func (p *Parser) AllAuthorities() ([]Resource, error) {
-	// Authorities contains SOA in case of NXDOMAIN and friends,
-	// otherwise it is empty.
-	//
-	// Pre-allocate up to a certain limit, since p.header is
-	// untrusted data.
-	n := int(p.header.authorities)
-	if n > 10 {
-		n = 10
-	}
-	as := make([]Resource, 0, n)
+	as := make([]Resource, 0, p.header.authorities)
 	for {
 		a, err := p.Authority()
 		if err == ErrSectionDone {
@@ -598,16 +574,7 @@ func (p *Parser) Additional() (Resource, error) {
 
 // AllAdditionals parses all Additional Resources.
 func (p *Parser) AllAdditionals() ([]Resource, error) {
-	// Additionals usually contain OPT, and sometimes A/AAAA
-	// glue records.
-	//
-	// Pre-allocate up to a certain limit, since p.header is
-	// untrusted data.
-	n := int(p.header.additionals)
-	if n > 10 {
-		n = 10
-	}
-	as := make([]Resource, 0, n)
+	as := make([]Resource, 0, p.header.additionals)
 	for {
 		a, err := p.Additional()
 		if err == ErrSectionDone {
@@ -859,8 +826,8 @@ func (m *Message) AppendPack(b []byte) ([]byte, error) {
 	// unconditionally enabling it is fine.
 	//
 	// DNS lookups are typically done over UDP, and RFC 1035 states that UDP
-	// DNS messages can be a maximum of 512 bytes long. Without compression,
-	// many DNS response messages are over this limit, so enabling
+	// DNS packets can be a maximum of 512 bytes long. Without compression,
+	// many DNS response packets are over this limit, so enabling
 	// compression will help ensure compliance.
 	compression := map[string]int{}
 
@@ -1240,7 +1207,7 @@ func (b *Builder) AAAAResource(h ResourceHeader, r AAAAResource) error {
 	return nil
 }
 
-// Finish ends message building and generates a binary message.
+// Finish ends message building and generates a binary packet.
 func (b *Builder) Finish() ([]byte, error) {
 	if b.section < sectionHeader {
 		return nil, ErrNotStarted
