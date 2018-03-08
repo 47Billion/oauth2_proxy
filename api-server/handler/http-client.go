@@ -112,7 +112,7 @@ func serverRequest(endpoint, provider string) (err error, respData []byte) {
 		return
 	} else if status != 200 {
 		log.Errorf("serverRequest() something went wrong endpoint=%s, statusCode=%d, msg=%s", endpoint, status, string(respData))
-		err = fmt.Errorf("serverRequest() something went wrong endpoint=%s, statusCode=%d, msg=%s", endpoint, status, string(respData))
+		err = fmt.Errorf("Something went wrong endpoint=%s, statusCode=%d, msg=%s", endpoint, status, string(respData))
 	}
 	return
 }
@@ -143,7 +143,7 @@ func getLinkedinUserInfo(endpoint, token string) (err error, respData []byte) {
 		return
 	} else if status != 200 {
 		log.Errorf("getLinkedinUserInfo() something went wrong endpoint=%s, statusCode=%d, msg=%s", endpoint, status, string(respData))
-		err = fmt.Errorf("getLinkedinUserInfo() something went wrong endpoint=%s, statusCode=%d, msg=%s", endpoint, status, string(respData))
+		err = fmt.Errorf("Something went wrong endpoint=%s, statusCode=%d, msg=%s", endpoint, status, string(respData))
 	}
 	return
 }
