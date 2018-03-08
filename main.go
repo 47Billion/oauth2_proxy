@@ -128,7 +128,6 @@ func main() {
 		googleCfg := make(EnvOptions)
 		googleCfg = loadOptionsFromConfig("config/google.cfg", googleCfg)
 		googleCfg["redirect_url"] = fmt.Sprintf("%s%s/callback", googleCfg["base_url"], googleCfg["proxy-prefix"])
-		fmt.Println("Redirect Url: ", googleCfg["redirect_url"])
 		config.Oauth2Config["google"] = googleCfg
 		googleOAuthproxy = verifyOpts(googleOpts, flagSet, googleCfg)
 	}
@@ -137,7 +136,6 @@ func main() {
 		fbCfg := make(EnvOptions)
 		fbCfg = loadOptionsFromConfig("config/facebook.cfg", fbCfg)
 		fbCfg["redirect_url"] = fmt.Sprintf("%s%s/callback", fbCfg["base_url"], fbCfg["proxy-prefix"])
-		fmt.Println("Redirect Url: ", fbCfg["redirect_url"])
 		config.Oauth2Config["fb"] = fbCfg
 		fbOAuthproxy = verifyOpts(fbOpts, flagSet, fbCfg)
 	}
@@ -146,7 +144,6 @@ func main() {
 		gitCfg := make(EnvOptions)
 		gitCfg = loadOptionsFromConfig("config/github.cfg", gitCfg)
 		gitCfg["redirect_url"] = fmt.Sprintf("%s%s/callback", gitCfg["base_url"], gitCfg["proxy-prefix"])
-		fmt.Println("Redirect Url: ", gitCfg["redirect_url"])
 		config.Oauth2Config["github"] = gitCfg
 		githubOAuthproxy = verifyOpts(gitOpts, flagSet, gitCfg)
 	}
@@ -155,7 +152,6 @@ func main() {
 		linkedinCfg := make(EnvOptions)
 		linkedinCfg = loadOptionsFromConfig("config/linkedin.cfg", linkedinCfg)
 		linkedinCfg["redirect_url"] = fmt.Sprintf("%s%s/callback", linkedinCfg["base_url"], linkedinCfg["proxy-prefix"])
-		fmt.Println("Redirect Url: ", linkedinCfg["redirect_url"])
 		config.Oauth2Config["linkedin"] = linkedinCfg
 		linkedinOAuthproxy = verifyOpts(linkedinOpts, flagSet, linkedinCfg)
 	}
