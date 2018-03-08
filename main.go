@@ -3,13 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"runtime"
 	"strings"
 	"time"
-	"net/http"
-	"io/ioutil"
 
 	"github.com/bitly/oauth2_proxy/api-server/handler"
 	"github.com/bitly/oauth2_proxy/config"
@@ -71,7 +71,7 @@ func main() {
 	flagSet.String("cookie-name", "_oauth2_proxy", "the name of the cookie that the oauth_proxy creates")
 	flagSet.String("cookie-secret", "", "the seed string for secure cookies (optionally base64 encoded)")
 	flagSet.String("cookie-domain", "", "an optional cookie domain to force cookies to (ie: .yourcompany.com)*")
-	flagSet.Duration("cookie-expire", time.Duration(168) * time.Hour, "expire timeframe for cookie")
+	flagSet.Duration("cookie-expire", time.Duration(168)*time.Hour, "expire timeframe for cookie")
 	flagSet.Duration("cookie-refresh", time.Duration(0), "refresh the cookie after this duration; 0 to disable")
 	flagSet.Bool("cookie-secure", true, "set secure (HTTPS) cookie flag")
 	flagSet.Bool("cookie-httponly", true, "set HttpOnly cookie flag")
@@ -159,9 +159,9 @@ func main() {
 	serveMux := http.NewServeMux()
 	abstractProxy := &AbstractProxy{
 		oauthProxy: map[string]*OAuthProxy{
-			"google": googleOAuthproxy,
-			"fb": fbOAuthproxy,
-			"github": githubOAuthproxy,
+			"google":   googleOAuthproxy,
+			"fb":       fbOAuthproxy,
+			"github":   githubOAuthproxy,
 			"linkedin": linkedinOAuthproxy,
 		},
 		serveMux: serveMux,
@@ -175,7 +175,7 @@ func main() {
 }
 
 func (a *AbstractProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	pathString := req.URL.Path;
+	pathString := req.URL.Path
 	var p *OAuthProxy
 	if strings.HasPrefix(pathString, "/google") {
 		p = a.oauthProxy["google"]
@@ -203,13 +203,13 @@ func (a *AbstractProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			rw.Write([]byte("404 Something went wrong - " + http.StatusText(404)))
 		}
 	case path == "/google/oauth2/callback":
-		handler.Google(rw, req)        // handle Google callback request
+		handler.Google(rw, req) // handle Google callback request
 	case path == "/fb/oauth2/callback":
-		handler.Facebook(rw, req)        // handle Facebook callback request
+		handler.Facebook(rw, req) // handle Facebook callback request
 	case path == "/github/oauth2/callback":
-		handler.Github(rw, req)         // handle Github callback request
+		handler.Github(rw, req) // handle Github callback request
 	case path == "/linkedin/oauth2/callback":
-		handler.Linkedin(rw, req)         // handle Linkedin callback request
+		handler.Linkedin(rw, req) // handle Linkedin callback request
 	case path == p.RobotsPath:
 		p.RobotsTxt(rw)
 	case path == p.PingPath:

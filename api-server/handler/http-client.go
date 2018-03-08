@@ -1,17 +1,17 @@
 package handler
 
 import (
-	"net/http"
-	"encoding/json"
-	"net/url"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
+	"net/url"
 
 	"github.com/bitly/oauth2_proxy/api-server/models"
 
-	"github.com/sethgrid/pester"
 	"github.com/apex/log"
+	"github.com/sethgrid/pester"
 )
 
 // Create's access token for google and linkedin POST call
@@ -144,35 +144,6 @@ func getLinkedinUserInfo(endpoint, token string) (err error, respData []byte) {
 	} else if status != 200 {
 		log.Errorf("getLinkedinUserInfo() something went wrong endpoint=%s, statusCode=%d, msg=%s", endpoint, status, string(respData))
 		err = fmt.Errorf("Something went wrong endpoint=%s, statusCode=%d, msg=%s", endpoint, status, string(respData))
-	}
-	return
-}
-
-// Callback request handler that will redirect our internal token to the callback URL.
-func callbackRequest(endpoint, tokenString string) (err error) {
-	// Client
-	client := pester.New()
-	client.KeepLog = true
-
-	url := fmt.Sprintf("%s?token=%s", endpoint, tokenString)
-
-	// Response
-	var resp *http.Response
-	resp, err = client.Get(url)
-	if nil != err {
-		log.Errorf("callbackRequest() Unable to call token API err=%+v", err)
-		return
-	}
-
-	// read response and check statusCode.
-	status := resp.StatusCode
-	respData, err := ioutil.ReadAll(resp.Body)
-	if nil != err {
-		log.Errorf("callbackRequest() Unable to read response err=%+v", err)
-		return
-	} else if status != 200 {
-		log.Errorf("callbackRequest() something went wrong statusCode=%d, msg=%s", status, string(respData))
-		err = fmt.Errorf("Something went wrong while sending response token at url=%s", endpoint)
 	}
 	return
 }
