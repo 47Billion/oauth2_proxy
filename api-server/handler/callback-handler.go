@@ -12,7 +12,6 @@ import (
 
 	"github.com/apex/log"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/kataras/iris/core/errors"
 )
 
 const (
@@ -323,6 +322,5 @@ func createJWTToken(data interface{}) (err error, tokenString string) {
 		log.Errorf("createJWTToken() Unable to create JWT token; err=%+v", err)
 		return
 	}
-	err = errors.New("Error while creating token")
 	return
 }
