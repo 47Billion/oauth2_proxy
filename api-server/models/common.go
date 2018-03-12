@@ -36,6 +36,7 @@ type GoogleLinkedinTokenRequest struct {
 	RedirectUrl  string `json:"redirect_url"`
 	Code         string `json:"code"`
 	GrantType    string `json:"grant_type"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 type GoogleTokenResp struct {
@@ -72,10 +73,20 @@ type GoogleUserInfo struct {
 	HD            string `json:"hd"`
 	VerifiedEmail bool   `json:"verified_email"`
 }
-
+type FBUserPicture struct {
+	Data struct {
+		Url          string `json:"url"`
+		Height       int    `json:"height"`
+		Width        int    `json:"width"`
+		IsSilhouette bool   `json:"is_silhouette"`
+	} `json:"data"`
+}
 type FBUserInfo struct {
-	Id   string `json:"id"`
-	Name string `json:"name"`
+	Id      string        `json:"id"`
+	Email   string        `json:"email"`
+	Name    string        `json:"name"`
+	Link    string        `json:"link"`
+	Picture FBUserPicture `json:"picture"`
 }
 
 type GitUserInfo struct {
@@ -108,8 +119,9 @@ type GitUserInfo struct {
 }
 
 type LinkedinUserInfo struct {
-	Id        string `json:"id"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	HeadLine  string `json:"headline"`
+	Id         string `json:"id"`
+	FirstName  string `json:"firstName"`
+	LastName   string `json:"lastName"`
+	HeadLine   string `json:"headline"`
+	PictureUrl string `json:"pictureUrl"`
 }

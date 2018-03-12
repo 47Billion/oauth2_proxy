@@ -16,13 +16,14 @@ import (
 
 const (
 	// Google Urls
-	GoogleTokenUrl    = "https://www.googleapis.com/oauth2/v3/token"
-	GoogleUserInfoUrl = "https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token="
-	GoogleGrantType   = "authorization_code"
+	GoogleTokenUrl         = "https://www.googleapis.com/oauth2/v4/token"
+	GoogleUserInfoUrl      = "https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token="
+	GoogleAuthGrantType    = "authorization_code"
+	GoogleRefreshGrantType = "refresh_token"
 
 	// FB Urls
 	FBAccessTokenUrl = "https://graph.facebook.com/v2.12/oauth/access_token"
-	FBGetUserUrl     = "https://graph.facebook.com/v2.12/me?access_token="
+	FBGetUserUrl     = "https://graph.facebook.com/v2.12/me?fields=id,name,email,gender,link,picture&access_token="
 
 	// Github Urls
 	GithubTokenUrl = "https://github.com/login/oauth/access_token"
@@ -30,7 +31,7 @@ const (
 
 	// Linkedin Urls
 	LinkedinTokenUrl    = "https://www.linkedin.com/oauth/v2/accessToken"
-	LinkedinUserInfoUrl = "https://api.linkedin.com/v1/people/~?format=json"
+	LinkedinUserInfoUrl = "https://api.linkedin.com/v1/people/~:(id,first_name,last_name,picture_url,headline)?format=json"
 )
 
 // Process oauth2 callback request for google, this will generate new access token and get user details.
@@ -48,13 +49,13 @@ func Google(rw http.ResponseWriter, req *http.Request) {
 		ClientId:     googleConfig["client_id"].(string),
 		ClientSecret: googleConfig["client_secret"].(string),
 		RedirectUrl:  googleConfig["redirect_url"].(string),
-		GrantType:    GoogleGrantType,
+		GrantType:    GoogleAuthGrantType,
 	}
 
 	// Create new access token
 	err, respData := createGoogleLinkedinToken(GoogleTokenUrl, tokenReq)
 	if nil != err {
-		log.Errorf("Google() Unable to generate token for Google with code=%s; err=%+v", code, err)
+		log.Errorf("Google() Unable to generate access token for Google with code=%s; err=%+v", code, err)
 		url = fmt.Sprintf("%s?error=error", config.CallbackUrl)
 		http.Redirect(rw, req, config.CallbackUrl, http.StatusPermanentRedirect)
 		return
@@ -63,12 +64,27 @@ func Google(rw http.ResponseWriter, req *http.Request) {
 	// Unmarshal token response data
 	err = json.Unmarshal(respData, &tokenResponse)
 	if nil != err {
-		log.Errorf("Google() Unable to unmarshal token response data err=%+v", err)
+		log.Errorf("Google() Unable to unmarshal access token response data err=%+v", err)
 		url = fmt.Sprintf("%s?error=error", config.CallbackUrl)
 		http.Redirect(rw, req, config.CallbackUrl, http.StatusPermanentRedirect)
 		return
 	}
-
+	tokenReq.GrantType = GoogleRefreshGrantType
+	tokenReq.RefreshToken = tokenResponse.RefreshToken
+	err, refreshTokenData := createGoogleRefreshToken(GoogleTokenUrl, tokenReq)
+	if nil != err {
+		log.Errorf("Google() Unable to generate refresh token for Google err=%+v", err)
+		url = fmt.Sprintf("%s?error=error", config.CallbackUrl)
+		http.Redirect(rw, req, config.CallbackUrl, http.StatusPermanentRedirect)
+		return
+	}
+	err = json.Unmarshal(refreshTokenData, &tokenResponse)
+	if nil != err {
+		log.Errorf("Google() Unable to unmarshal refresh token response data err=%+v", err)
+		url = fmt.Sprintf("%s?error=error", config.CallbackUrl)
+		http.Redirect(rw, req, config.CallbackUrl, http.StatusPermanentRedirect)
+		return
+	}
 	// Create proper user info api with access token
 	userInfoEndpoint := fmt.Sprintf("%s%s", GoogleUserInfoUrl, tokenResponse.AccessToken)
 
@@ -157,10 +173,15 @@ func Facebook(rw http.ResponseWriter, req *http.Request) {
 		http.Redirect(rw, req, config.CallbackUrl, http.StatusPermanentRedirect)
 		return
 	}
+
 	redirectResponse := models.RedirectResponse{
-		Id:   userInfo.Id,
-		Name: userInfo.Name,
+		Id:      userInfo.Id,
+		Name:    userInfo.Name,
+		Email:   userInfo.Email,
+		Link:    userInfo.Link,
+		Picture: userInfo.Picture.Data.Url,
 	}
+
 	err, tokenString := createJWTToken(redirectResponse)
 	if nil != err {
 		log.Errorf("Facebook() Unable to create JWT token; err=%+v", err)
@@ -293,11 +314,11 @@ func Linkedin(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	log.Infof("User Details: %+v", userInfo)
 	name := fmt.Sprintf("%s %s", userInfo.FirstName, userInfo.LastName)
 	redirectResponse := models.RedirectResponse{
-		Id:   userInfo.Id,
-		Name: name,
+		Id:      userInfo.Id,
+		Name:    name,
+		Picture: userInfo.PictureUrl,
 	}
 	err, tokenString := createJWTToken(redirectResponse)
 	if nil != err {

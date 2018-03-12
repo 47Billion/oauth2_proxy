@@ -30,7 +30,7 @@ func createGoogleLinkedinToken(endpoint string, reqData models.GoogleLinkedinTok
 
 	// Request object with POST method
 	req, err := http.NewRequest("POST", endpoint, bytes.NewBufferString(params.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	// Response
 	var resp *http.Response
@@ -49,6 +49,46 @@ func createGoogleLinkedinToken(endpoint string, reqData models.GoogleLinkedinTok
 	} else if status != 200 {
 		log.Errorf("createGoogleLinkedinToken() something went wrong statusCode=%d, msg=%s", status, string(respData))
 		err = fmt.Errorf("createGoogleLinkedinToken() something went wrong statusCode=%d, msg=%s", status, string(respData))
+	}
+	return
+}
+
+// Create's access token for google and linkedin POST call
+func createGoogleRefreshToken(endpoint string, reqData models.GoogleLinkedinTokenRequest) (err error, respData []byte) {
+	// Client
+	client := pester.New()
+	client.KeepLog = true
+
+	log.Infof("reqData.GrantType - %s", reqData.GrantType)
+	// make request data in url value form
+	params := url.Values{}
+	params.Add("client_id", reqData.ClientId)
+	params.Add("client_secret", reqData.ClientSecret)
+	params.Add("refresh_token", reqData.RefreshToken)
+	params.Add("grant_type", reqData.GrantType)
+
+	log.Info(params.Encode())
+	// Request object with POST method
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBufferString(params.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	// Response
+	var resp *http.Response
+	resp, err = http.DefaultClient.Do(req)
+	if nil != err {
+		log.Errorf("createGoogleLinkedinToken() Unable to call token API err=%+v", err)
+		return
+	}
+
+	// Read response body data
+	status := resp.StatusCode
+	respData, err = ioutil.ReadAll(resp.Body)
+	if nil != err {
+		log.Errorf("createGoogleLinkedinToken() Unable to read response err=%+v", err)
+		return
+	} else if status != 200 {
+		log.Errorf("createGoogleLinkedinToken() something went wrong statusCode=%d, msg=%s", status, string(respData))
+		err = fmt.Errorf("Something went wrong statusCode=%d, msg=%s", status, string(respData))
 	}
 	return
 }
