@@ -134,7 +134,7 @@ func main() {
 	if *fb {
 		fbOpts := NewOptions()
 		fbCfg := make(EnvOptions)
-		fbCfg = loadOptionsFromConfig("config/facebook.cfg", fbCfg)
+		fbCfg = loadOptionsFromConfig("config/fb.cfg", fbCfg)
 		fbCfg["redirect_url"] = fmt.Sprintf("%s%s/callback", fbCfg["base_url"], fbCfg["proxy-prefix"])
 		config.Oauth2Config["fb"] = fbCfg
 		fbOAuthproxy = verifyOpts(fbOpts, flagSet, fbCfg)
